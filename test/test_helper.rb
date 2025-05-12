@@ -1,17 +1,17 @@
-require 'simplecov'
-require 'simplecov-json'
+require "simplecov"
+require "simplecov-json"
 
 # Configure SimpleCov
-SimpleCov.start 'rails' do
-  add_filter '/bin/'
-  add_filter '/db/'
-  add_filter '/test/'
-  add_group 'Controllers', 'app/controllers'
-  add_group 'Models', 'app/models'
-  add_group 'Views', 'app/views'
+SimpleCov.start "rails" do
+  add_filter "/bin/"
+  add_filter "/db/"
+  add_filter "/test/"
+  add_group "Controllers", "app/controllers"
+  add_group "Models", "app/models"
+  add_group "Views", "app/views"
 
   # Enable JSON formatter when COVERAGE_FORMAT=json env variable is set
-  if ENV['COVERAGE_FORMAT'] == 'json'
+  if ENV["COVERAGE_FORMAT"] == "json"
     SimpleCov.formatters = SimpleCov::Formatter::JSONFormatter
   end
 
