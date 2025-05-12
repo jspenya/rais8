@@ -61,18 +61,37 @@ jobs:
         # Install jq for JSON parsing
         sudo apt-get update && sudo apt-get install -y jq
 
+        # Display the JSON file structure to help with debugging
+        echo "JSON structure overview:"
+        jq '.files | length' coverage/coverage.json
+
         # Check coverage for each changed file
         FAILED=0
         for FILE in $CHANGED_FILES; do
           if [ -f "$FILE" ]; then
-            # Get file path relative to project root for SimpleCov
-            REL_PATH=$(echo $FILE | sed 's|^app/||')
+            echo "Checking file: $FILE"
 
-            # Extract file coverage from the coverage JSON
-            FILE_COVERAGE=$(jq -r --arg file "$FILE" '.["files"] | to_entries[] | select(.key | endswith($file)) | .value | .["covered_percent"]' coverage/coverage.json)
+            # Get the full path to the file
+            FULL_PATH="$(pwd)/$FILE"
+
+            # Extract file coverage from the coverage JSON using the updated structure
+            FILE_COVERAGE=$(jq -r --arg file "$FULL_PATH" '.files[] | select(.filename == $file) | .covered_percent' coverage/coverage.json)
+
+            # If not found with full path, try with just the file path
+            if [ -z "$FILE_COVERAGE" ]; then
+              FILE_COVERAGE=$(jq -r --arg file "$FILE" '.files[] | select(.filename | endswith($file)) | .covered_percent' coverage/coverage.json)
+            fi
+
+            # If still not found, try with filename only
+            if [ -z "$FILE_COVERAGE" ]; then
+              FILENAME=$(basename "$FILE")
+              FILE_COVERAGE=$(jq -r --arg file "$FILENAME" '.files[] | select(.filename | endswith($file)) | .covered_percent' coverage/coverage.json)
+            fi
 
             if [ -z "$FILE_COVERAGE" ]; then
-              echo "::warning::Cannot find coverage for $FILE, it might be a new file without tests."
+              echo "::warning::Cannot find coverage for $FILE in the JSON report."
+              echo "Available files in coverage report:"
+              jq -r '.files[] | .filename' coverage/coverage.json
               FAILED=1
               continue
             fi

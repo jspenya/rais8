@@ -12,7 +12,11 @@ SimpleCov.start "rails" do
 
   # Enable JSON formatter when COVERAGE_FORMAT=json env variable is set
   if ENV["COVERAGE_FORMAT"] == "json"
-    SimpleCov.formatters = SimpleCov::Formatter::JSONFormatter
+    # Use both HTML and JSON formatters
+    SimpleCov.formatters = SimpleCov::Formatter::MultiFormatter.new([
+      SimpleCov::Formatter::HTMLFormatter,
+      SimpleCov::Formatter::JSONFormatter
+    ])
   end
 
   # Track all code coverage changes in PRs
