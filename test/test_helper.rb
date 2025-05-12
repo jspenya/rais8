@@ -6,6 +6,8 @@ SimpleCov.start "rails" do
   add_filter "/bin/"
   add_filter "/db/"
   add_filter "/test/"
+  add_filter "db/schema.rb"  # Explicitly exclude schema.rb
+  add_filter "test/test_helper.rb"  # Explicitly exclude test_helper.rb
   add_group "Controllers", "app/controllers"
   add_group "Models", "app/models"
   add_group "Views", "app/views"

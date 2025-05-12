@@ -42,6 +42,16 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "should not create invalid post with turbo_stream" do
+    assert_no_difference("Post.count") do
+      post posts_url, params: { post: { title: "", content: "" } },
+           as: :turbo_stream
+    end
+
+    assert_response :success
+    assert_match /<turbo-stream action="replace" target="post_form"/, @response.body
+  end
+
   test "should show post" do
     get post_url(@post)
     assert_response :success
@@ -77,6 +87,17 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   test "should not update invalid post" do
     patch post_url(@post), params: { post: { title: "", content: "" } }
     assert_response :unprocessable_entity
+  end
+
+  test "should not update invalid post with turbo_stream" do
+    patch post_url(@post), params: { post: { title: "", content: "" } },
+          as: :turbo_stream
+
+    assert_response :success
+    assert_match /<turbo-stream action="replace" target="post_form"/, @response.body
+
+    @post.reload
+    assert_not_equal "", @post.title
   end
 
   test "should destroy post" do

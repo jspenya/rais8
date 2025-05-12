@@ -32,6 +32,36 @@ jobs:
       env:
         COVERAGE_FORMAT: json
 
+    - name: Display coverage summary
+      run: |
+        echo "### Coverage Summary :chart_with_upwards_trend:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Install jq for JSON parsing
+        sudo apt-get update && sudo apt-get install -y jq
+
+        # Extract overall coverage from JSON
+        TOTAL_COVERAGE=$(jq -r '.metrics.covered_percent' coverage/coverage.json)
+        TOTAL_LINES=$(jq -r '.metrics.total_lines' coverage/coverage.json)
+        COVERED_LINES=$(jq -r '.metrics.covered_lines' coverage/coverage.json)
+
+        echo "**Overall coverage:** $TOTAL_COVERAGE%" >> $GITHUB_STEP_SUMMARY
+        echo "**Covered Lines:** $COVERED_LINES of $TOTAL_LINES" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Generate file-by-file coverage table
+        echo "| File | Coverage % | Lines |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+
+        jq -r '.files[] | select(.covered_percent < 100) | "| \(.filename) | \(.covered_percent)% | \(.covered_lines)/\(.lines_of_code) |"' coverage/coverage.json | sort -r -k3 >> $GITHUB_STEP_SUMMARY
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Files with 100% coverage" >> $GITHUB_STEP_SUMMARY
+        echo "| File | Coverage % | Lines |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+
+        jq -r '.files[] | select(.covered_percent == 100) | "| \(.filename) | \(.covered_percent)% | \(.covered_lines)/\(.lines_of_code) |"' coverage/coverage.json | sort -r -k3 >> $GITHUB_STEP_SUMMARY
+
     - name: Upload coverage results
       uses: actions/upload-artifact@v4
       with:
@@ -42,14 +72,14 @@ jobs:
       if: github.event_name == 'pull_request'
       run: |
         # Get list of files changed in this PR
-        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} | grep -E '\.rb$' | grep -v '_test\.rb$' || true)
+        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} | grep -E '\.rb$' | grep -v '_test\.rb$' | grep -v 'db/schema\.rb' | grep -v 'test/test_helper\.rb' || true)
 
         if [ -z "$CHANGED_FILES" ]; then
-          echo "No Ruby files changed in this PR"
+          echo "No Ruby files changed in this PR (excluding test files, schema.rb, and test_helper.rb)"
           exit 0
         fi
 
-        echo "Changed Ruby files:"
+        echo "Changed Ruby files to check coverage for:"
         echo "$CHANGED_FILES"
 
         # Check if coverage/coverage.json exists
@@ -69,6 +99,12 @@ jobs:
         FAILED=0
         for FILE in $CHANGED_FILES; do
           if [ -f "$FILE" ]; then
+            # Skip explicitly excluded files
+            if [[ "$FILE" == "db/schema.rb" || "$FILE" == "test/test_helper.rb" ]]; then
+              echo "Skipping excluded file: $FILE"
+              continue
+            fi
+
             echo "Checking file: $FILE"
 
             # Get the full path to the file
