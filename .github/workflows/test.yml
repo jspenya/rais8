@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4.2
+        bundler-cache: true
+
+    - name: Install dependencies
+      run: bundle install
+
+    - name: Setup database
+      run: bin/rails db:create db:migrate RAILS_ENV=test
+
+    - name: Run tests
+      run: bin/rails test
+
+    - name: Upload coverage results
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-coverage
+        path: coverage/

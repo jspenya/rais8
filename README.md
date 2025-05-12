@@ -1,24 +1,45 @@
-# README
+# Turbo Streams Blog
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+[![Tests](https://github.com/yourusername/rais8/actions/workflows/test.yml/badge.svg)](https://github.com/yourusername/rais8/actions/workflows/test.yml)
 
-Things you may want to cover:
+A simple blog application built with Ruby on Rails and Turbo Streams. This application demonstrates the power of Hotwire to create reactive web interfaces without writing custom JavaScript.
 
-* Ruby version
+## Features
 
-* System dependencies
+- Create, read, update, and delete blog posts
+- Live updates with Turbo Streams
+- Responsive design
 
-* Configuration
+## Technology Stack
 
-* Database creation
+- Ruby 3.4.2
+- Rails 8.1.0.alpha
+- Turbo Rails (Hotwire)
+- SQLite
 
-* Database initialization
+## Development Setup
 
-* How to run the test suite
+1. Clone the repository
+2. Install dependencies:
+   ```
+   bundle install
+   ```
+3. Set up the database:
+   ```
+   rails db:create db:migrate
+   ```
+4. Start the server:
+   ```
+   rails server
+   ```
+5. Visit `http://localhost:3000` in your browser
 
-* Services (job queues, cache servers, search engines, etc.)
+## Test Coverage
 
-* Deployment instructions
+This project uses SimpleCov for test coverage reporting. After running the tests, you can see the coverage report in the `coverage` directory.
 
-* ...
+```
+rails test
+```
+
+Current coverage: 84.62%
