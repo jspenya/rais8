@@ -1,11 +1,11 @@
-require 'simplecov'
-SimpleCov.start 'rails' do
-  add_filter '/bin/'
-  add_filter '/db/'
-  add_filter '/test/'
-  add_group 'Controllers', 'app/controllers'
-  add_group 'Models', 'app/models'
-  add_group 'Views', 'app/views'
+require "simplecov"
+SimpleCov.start "rails" do
+  add_filter "/bin/"
+  add_filter "/db/"
+  add_filter "/test/"
+  add_group "Controllers", "app/controllers"
+  add_group "Models", "app/models"
+  add_group "Views", "app/views"
 end
 
 ENV["RAILS_ENV"] ||= "test"
