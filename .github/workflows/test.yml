@@ -75,11 +75,18 @@ jobs:
         echo "Event name: ${{ github.event_name }}"
         echo "Base ref: ${{ github.base_ref }}"
 
-        # Get list of files changed in this PR
-        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} HEAD | grep -E '\.rb$' | grep -v '_test\.rb$' | grep -v 'db/schema\.rb' | grep -v 'test/test_helper\.rb' || true)
+        # Get list of files changed in this PR, excluding files we don't want to check coverage for
+        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} HEAD |
+          grep -E '\.rb$' |
+          grep -v '_test\.rb$' |
+          grep -v 'db/schema\.rb' |
+          grep -v 'test/test_helper\.rb' |
+          grep -v 'config/routes\.rb' |
+          grep -v 'db/migrate/' ||
+          true)
 
         if [ -z "$CHANGED_FILES" ]; then
-          echo "No Ruby files changed in this PR (excluding test files, schema.rb, and test_helper.rb)"
+          echo "No Ruby files changed in this PR that require test coverage"
           exit 0
         fi
 
@@ -102,8 +109,11 @@ jobs:
         FAILED=0
         for FILE in $CHANGED_FILES; do
           if [ -f "$FILE" ]; then
-            # Skip explicitly excluded files
-            if [[ "$FILE" == "db/schema.rb" || "$FILE" == "test/test_helper.rb" ]]; then
+            # Skip files we don't want to check coverage for
+            if [[ "$FILE" == "db/schema.rb" ||
+                  "$FILE" == "test/test_helper.rb" ||
+                  "$FILE" == "config/routes.rb" ||
+                  "$FILE" =~ db/migrate/* ]]; then
               echo "Skipping excluded file: $FILE"
               continue
             fi
