@@ -55,6 +55,7 @@ group :development, :test do
 
   # Code coverage
   gem "simplecov", require: false
+  gem "simplecov-json", require: false
 end
 
 group :development do

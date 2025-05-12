@@ -12,6 +12,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
@@ -25,11 +27,67 @@ jobs:
     - name: Setup database
       run: bin/rails db:create db:migrate RAILS_ENV=test
 
-    - name: Run tests
-      run: bin/rails test
+    - name: Run tests with coverage
+      run: COVERAGE=true bin/rails test
+      env:
+        COVERAGE_FORMAT: json
 
     - name: Upload coverage results
       uses: actions/upload-artifact@v4
       with:
         name: code-coverage
         path: coverage/
+
+    - name: Check coverage on changed files
+      if: github.event_name == 'pull_request'
+      run: |
+        # Get list of files changed in this PR
+        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} | grep -E '\.rb$' | grep -v '_test\.rb$' || true)
+
+        if [ -z "$CHANGED_FILES" ]; then
+          echo "No Ruby files changed in this PR"
+          exit 0
+        fi
+
+        echo "Changed Ruby files:"
+        echo "$CHANGED_FILES"
+
+        # Check if coverage/coverage.json exists
+        if [ ! -f coverage/coverage.json ]; then
+          echo "::error::Coverage JSON file not found. Make sure SimpleCov is configured to output JSON."
+          exit 1
+        fi
+
+        # Install jq for JSON parsing
+        sudo apt-get update && sudo apt-get install -y jq
+
+        # Check coverage for each changed file
+        FAILED=0
+        for FILE in $CHANGED_FILES; do
+          if [ -f "$FILE" ]; then
+            # Get file path relative to project root for SimpleCov
+            REL_PATH=$(echo $FILE | sed 's|^app/||')
+
+            # Extract file coverage from the coverage JSON
+            FILE_COVERAGE=$(jq -r --arg file "$FILE" '.["files"] | to_entries[] | select(.key | endswith($file)) | .value | .["covered_percent"]' coverage/coverage.json)
+
+            if [ -z "$FILE_COVERAGE" ]; then
+              echo "::warning::Cannot find coverage for $FILE, it might be a new file without tests."
+              FAILED=1
+              continue
+            fi
+
+            # If coverage is less than 100%, mark as failure
+            if (( $(echo "$FILE_COVERAGE < 100" | bc -l) )); then
+              echo "::error::$FILE has only $FILE_COVERAGE% test coverage, but 100% is required."
+              FAILED=1
+            else
+              echo "✅ $FILE has 100% test coverage."
+            fi
+          fi
+        done
+
+        if [ $FAILED -eq 1 ]; then
+          echo "::error::Some files don't have 100% test coverage. Please add tests for these files."
+          exit 1
+        fi

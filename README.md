@@ -43,3 +43,15 @@ rails test
 ```
 
 Current coverage: 84.62%
+
+### Pull Request Requirements
+
+All pull requests must have 100% test coverage for any code changes. The GitHub Action workflow will automatically check this and fail if any new or modified code doesn't have complete test coverage.
+
+To run tests locally with coverage reporting:
+
+```
+COVERAGE=true rails test
+```
+
+To check the coverage of changes compared to the main branch, you can use SimpleCov and run tests before submitting your PR.
