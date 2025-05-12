@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]
+    branches: '*'
 
 jobs:
   test:
@@ -71,8 +71,12 @@ jobs:
     - name: Check coverage on changed files
       if: github.event_name == 'pull_request'
       run: |
+        # Check if this is a pull request
+        echo "Event name: ${{ github.event_name }}"
+        echo "Base ref: ${{ github.base_ref }}"
+
         # Get list of files changed in this PR
-        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} | grep -E '\.rb$' | grep -v '_test\.rb$' | grep -v 'db/schema\.rb' | grep -v 'test/test_helper\.rb' || true)
+        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} HEAD | grep -E '\.rb$' | grep -v '_test\.rb$' | grep -v 'db/schema\.rb' | grep -v 'test/test_helper\.rb' || true)
 
         if [ -z "$CHANGED_FILES" ]; then
           echo "No Ruby files changed in this PR (excluding test files, schema.rb, and test_helper.rb)"
@@ -88,8 +92,7 @@ jobs:
           exit 1
         fi
 
-        # Install jq for JSON parsing
-        sudo apt-get update && sudo apt-get install -y jq
+        # Install jq for JSON parsing (should already be installed from previous step)
 
         # Display the JSON file structure to help with debugging
         echo "JSON structure overview:"
