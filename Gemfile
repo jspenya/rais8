@@ -52,6 +52,10 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # Code coverage
+  gem "simplecov", require: false
+  gem "simplecov-json", require: false
 end
 
 group :development do

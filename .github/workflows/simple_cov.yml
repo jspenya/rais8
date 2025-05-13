@@ -1,0 +1,161 @@
+name: SimpleCov
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: '*'
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4.2
+        bundler-cache: true
+
+    - name: Install dependencies
+      run: bundle install
+
+    - name: Setup database
+      run: bin/rails db:create db:migrate RAILS_ENV=test
+
+    - name: Run tests with coverage
+      run: COVERAGE=true bin/rails test
+      env:
+        COVERAGE_FORMAT: json
+
+    - name: Display coverage summary
+      run: |
+        echo "### Coverage Summary :chart_with_upwards_trend:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Install jq for JSON parsing
+        sudo apt-get update && sudo apt-get install -y jq
+
+        # Extract overall coverage from JSON
+        TOTAL_COVERAGE=$(jq -r '.metrics.covered_percent' coverage/coverage.json)
+        TOTAL_LINES=$(jq -r '.metrics.total_lines' coverage/coverage.json)
+        COVERED_LINES=$(jq -r '.metrics.covered_lines' coverage/coverage.json)
+
+        echo "**Overall coverage:** $TOTAL_COVERAGE%" >> $GITHUB_STEP_SUMMARY
+        echo "**Covered Lines:** $COVERED_LINES of $TOTAL_LINES" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Generate file-by-file coverage table
+        echo "| File | Coverage % | Lines |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+
+        jq -r '.files[] | select(.covered_percent < 100) | "| \(.filename) | \(.covered_percent)% | \(.covered_lines)/\(.lines_of_code) |"' coverage/coverage.json | sort -r -k3 >> $GITHUB_STEP_SUMMARY
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Files with 100% coverage" >> $GITHUB_STEP_SUMMARY
+        echo "| File | Coverage % | Lines |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+
+        jq -r '.files[] | select(.covered_percent == 100) | "| \(.filename) | \(.covered_percent)% | \(.covered_lines)/\(.lines_of_code) |"' coverage/coverage.json | sort -r -k3 >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload coverage results
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-coverage
+        path: coverage/
+
+    - name: Check coverage on changed files
+      if: github.event_name == 'pull_request'
+      run: |
+        # Check if this is a pull request
+        echo "Event name: ${{ github.event_name }}"
+        echo "Base ref: ${{ github.base_ref }}"
+
+        # Get list of files changed in this PR, excluding files we don't want to check coverage for
+        CHANGED_FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} HEAD |
+          grep -E '\.rb$' |
+          grep -v '_test\.rb$' |
+          grep -v 'db/schema\.rb' |
+          grep -v 'test/test_helper\.rb' |
+          grep -v 'config/routes\.rb' |
+          grep -v 'db/migrate/' ||
+          true)
+
+        if [ -z "$CHANGED_FILES" ]; then
+          echo "No Ruby files changed in this PR that require test coverage"
+          exit 0
+        fi
+
+        echo "Changed Ruby files to check coverage for:"
+        echo "$CHANGED_FILES"
+
+        # Check if coverage/coverage.json exists
+        if [ ! -f coverage/coverage.json ]; then
+          echo "::error::Coverage JSON file not found. Make sure SimpleCov is configured to output JSON."
+          exit 1
+        fi
+
+        # Install jq for JSON parsing (should already be installed from previous step)
+
+        # Display the JSON file structure to help with debugging
+        echo "JSON structure overview:"
+        jq '.files | length' coverage/coverage.json
+
+        # Check coverage for each changed file
+        FAILED=0
+        for FILE in $CHANGED_FILES; do
+          if [ -f "$FILE" ]; then
+            # Skip files we don't want to check coverage for
+            if [[ "$FILE" == "db/schema.rb" ||
+                  "$FILE" == "test/test_helper.rb" ||
+                  "$FILE" == "config/routes.rb" ||
+                  "$FILE" =~ db/migrate/* ]]; then
+              echo "Skipping excluded file: $FILE"
+              continue
+            fi
+
+            echo "Checking file: $FILE"
+
+            # Get the full path to the file
+            FULL_PATH="$(pwd)/$FILE"
+
+            # Extract file coverage from the coverage JSON using the updated structure
+            FILE_COVERAGE=$(jq -r --arg file "$FULL_PATH" '.files[] | select(.filename == $file) | .covered_percent' coverage/coverage.json)
+
+            # If not found with full path, try with just the file path
+            if [ -z "$FILE_COVERAGE" ]; then
+              FILE_COVERAGE=$(jq -r --arg file "$FILE" '.files[] | select(.filename | endswith($file)) | .covered_percent' coverage/coverage.json)
+            fi
+
+            # If still not found, try with filename only
+            if [ -z "$FILE_COVERAGE" ]; then
+              FILENAME=$(basename "$FILE")
+              FILE_COVERAGE=$(jq -r --arg file "$FILENAME" '.files[] | select(.filename | endswith($file)) | .covered_percent' coverage/coverage.json)
+            fi
+
+            if [ -z "$FILE_COVERAGE" ]; then
+              echo "::warning::Cannot find coverage for $FILE in the JSON report."
+              echo "Available files in coverage report:"
+              jq -r '.files[] | .filename' coverage/coverage.json
+              FAILED=1
+              continue
+            fi
+
+            # If coverage is less than 100%, mark as failure
+            if (( $(echo "$FILE_COVERAGE < 100" | bc -l) )); then
+              echo "::error::$FILE has only $FILE_COVERAGE% test coverage, but 100% is required."
+              FAILED=1
+            else
+              echo "✅ $FILE has 100% test coverage."
+            fi
+          fi
+        done
+
+        if [ $FAILED -eq 1 ]; then
+          echo "::error::Some files don't have 100% test coverage. Please add tests for these files."
+          exit 1
+        fi
