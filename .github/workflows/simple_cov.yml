@@ -63,7 +63,7 @@ jobs:
         jq -r '.files[] | select(.covered_percent == 100) | "| \(.filename) | \(.covered_percent)% | \(.covered_lines)/\(.lines_of_code) |"' coverage/coverage.json | sort -r -k3 >> $GITHUB_STEP_SUMMARY
 
     - name: Upload coverage results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: code-coverage
         path: coverage/
